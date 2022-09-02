@@ -1,0 +1,173 @@
+### Create database tables for De Anza College student registration ###
+
+CREATE TABLE college (
+id NUMBER(5),
+name VARCHAR2(50),
+address VARCHAR2(100),
+tel VARCHAR2(20),
+CONSTRAINT college_id_pk PRIMARY KEY(id));
+
+CREATE TABLE resident (
+id NUMBER(5),
+resiname VARCHAR2(50),
+feesched VARCHAR2(20),
+CONSTRAINT resident_id_pk PRIMARY KEY(id));
+
+CREATE TABLE location (
+id NUMBER(5),
+locname VARCHAR2(50),
+CONSTRAINT location_id_pk PRIMARY KEY(id));
+
+CREATE TABLE payment (
+id NUMBER(5),
+paymentname VARCHAR2(50),
+method VARCHAR2(10),
+CONSTRAINT payment_id_pk PRIMARY KEY(id));
+
+CREATE TABLE user1 (
+id NUMBER(5),
+firstname VARCHAR2(50),
+lastname VARCHAR2(50),
+address VARCHAR2(100),
+email VARCHAR2(50),
+telno VARCHAR2(20),
+resid NUMBER(5),
+type VARCHAR2(10),
+CONSTRAINT user1_id_pk PRIMARY KEY(id),
+CONSTRAINT user1_resid_fk FOREIGN KEY(resid)
+	REFERENCES resident(id))
+
+CREATE TABLE dept (
+id NUMBER(5),
+name VARCHAR2(50),
+locid NUMBER(5),
+colid NUMBER(5),
+CONSTRAINT dept_id_pk PRIMARY KEY(id),
+CONSTRAINT dept_locid_fk FOREIGN KEY(locid)
+	REFERENCES location(id),
+CONSTRAINT dept_colid_fk FOREIGN KEY(colid)
+	REFERENCES college(id));
+
+CREATE TABLE course (
+id NUMBER(5),
+courseno VARCHAR2(20) UNIQUE,
+coursename VARCHAR2(100),
+prereq VARCHAR2(50),
+deptid NUMBER(5),
+CONSTRAINT course_id_pk PRIMARY KEY(id),
+CONSTRAINT course_deptid_fk FOREIGN KEY(deptid)
+	REFERENCES dept(id));
+
+CREATE TABLE section (
+id NUMBER(5),
+sectionno VARCHAR2(5),
+courseid NUMBER(5),
+locid NUMBER(5),
+starttime TIMESTAMP,
+endtime TIMESTAMP,
+startdate DATE,
+enddate DATE,
+userid NUMBER(5),
+CONSTRAINT section_id_pk PRIMARY KEY(id),
+CONSTRAINT section_courseid_fk FOREIGN KEY(courseid)
+	REFERENCES course(id),
+CONSTRAINT section_locid_fk FOREIGN KEY(locid)
+	REFERENCES location(id),
+CONSTRAINT section_userid_fk FOREIGN KEY(userid)
+	REFERENCES user1(id));
+
+CREATE TABLE studentreg (
+id NUMBER(5),
+userid NUMBER(5),
+sectionid NUMBER(5),
+feestatus VARCHAR2(10),
+paymentid NUMBER(5),
+CONSTRAINT studentreg_id_pk PRIMARY KEY(id),
+CONSTRAINT studentreg_userid_fk FOREIGN KEY(userid)
+	REFERENCES user1(id),
+CONSTRAINT studentreg_sectionid_fk FOREIGN KEY(sectionid)
+	REFERENCES section(id),
+CONSTRAINT studentreg_paymentid_fk FOREIGN KEY(paymentid)
+	REFERENCES payment(id))
+	
+
+### Set up an example course with two sections (and their locations) within a department of the college ###
+
+INSERT INTO college VALUES (11111, 'DE ANZA COLLEGE', '21250 STEVENS CREEK BLVD, CUPERTINO, CA 95014', '408 864 5300');
+
+INSERT INTO location VALUES (22222, 'ADM101');
+INSERT INTO location VALUES (15678, 'ONLINE');
+
+INSERT INTO dept VALUES (33333, 'Computer Information Systems', 22222, 11111);
+
+INSERT INTO course VALUES (26589, 32933, 'Intro to SQL', NULL, 33333);
+
+INSERT INTO user1 VALUES (94874, 'SUKHJIT', 'SINGH', '123 ORACLE LN, SQLVILLE, CA 96789', 'BOBSINGH@AOL.COM', '408 867 5309', NULL, 'FACULTY');
+
+ALTER SESSION
+SET NLS_TIMESTAMP_FORMAT = 'HH.MI.SS AM';
+
+INSERT INTO section VALUES (56897, 'D0001', 26589, 15678, '12.00.00 PM', '2.00.00 PM', '04-JAN-2021', '26-MAR-2021', 94874);
+INSERT INTO section VALUES (56898, 'D0002', 26589, 15678, '4.00.00 PM', '6.00.00 PM', '04-JAN-2021', '26-MAR-2021', 94874);
+
+
+### Generate a catalog view of department, its courses and sections with complete info ###
+
+CREATE VIEW catalog AS
+SELECT d.name, c.coursename, s.sectionno, s.starttime, s.endtime, s.startdate, s.enddate, l.locname, u.lastname
+FROM dept d INNER JOIN course c ON d.id = c.deptid
+INNER JOIN section s ON c.id = s.courseid
+INNER JOIN location l ON s.locid = l.id
+INNER JOIN user1 u ON s.userid = u.id;
+
+SET pagesize 500;
+SET linesize 250;
+
+COLUMN name HEADING "Department" FORMAT A28
+COLUMN coursename HEADING "Course" FORMAT A12
+COLUMN sectionno HEADING "Section" FORMAT A7
+COLUMN starttime HEADING "Start Time" FORMAT A12
+COLUMN endtime HEADING "End Time" FORMAT A12
+COLUMN startdate HEADING "Start Date" FORMAT A10
+COLUMN enddate HEADING "End Date" FORMAT A10
+COLUMN locname HEADING "Location" FORMAT A8
+COLUMN lastname HEADING "Instructor" FORMAT A10
+
+OUTPUT:
+
+Department		     Course	  Section Start Time   End Time     Start Date End Date   Location Instructor
+---------------------------- ------------ ------- ------------ ------------ ---------- ---------- -------- ----------
+Computer Information Systems Intro to SQL D0001   12.00.00 PM  02.00.00 PM  04-JAN-21  26-MAR-21  ONLINE   SINGH
+Computer Information Systems Intro to SQL D0002   04.00.00 PM  06.00.00 PM  04-JAN-21  26-MAR-21  ONLINE   SINGH
+
+
+### Register a student to a section and processes their payment ###
+
+INSERT INTO resident VALUES (67890, 'IN-STATE', 'REGULAR');
+
+INSERT INTO user1 VALUES (94822, 'SABA', 'NAQVI', '4438 MANZANITA DR, SAN JOSE, CA 95129', 'SABANAQVI97@GMAIL.COM', '408 355 0225', 67890, 'STUDENT');
+
+INSERT INTO payment VALUES (45811, 'WINTER 21 FEES', 'VISA');
+
+INSERT INTO studentreg VALUES (22568, 94822, 56897, 'PAID', 45811); 
+
+
+### Generate report of student registration and payment information ###
+
+SELECT u.firstname, u.lastname, r.feestatus, s.sectionno, p.paymentname, p.method
+FROM user1 u INNER JOIN studentreg r ON u.id = r.userid
+INNER JOIN section s ON r.sectionid = s.id
+INNER JOIN payment p ON r.paymentid = p.id;
+
+COLUMN firstname HEADING "First" FORMAT A5
+COLUMN lastname HEADING "Last" FORMAT A5
+COLUMN feestatus HEADING "Fee Status" FORMAT A10
+COLUMN paymentname HEADING "Payment Name" FORMAT A15
+COLUMN method HEADING "Payment Method" FORMAT A15
+
+OUTPUT:
+
+First Last  Fee Status Section Payment Name    Payment Method
+----- ----- ---------- ------- --------------- ---------------
+SABA  NAQVI PAID       D0001   WINTER 21 FEES  VISA
+
